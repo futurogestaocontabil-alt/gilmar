@@ -1,3 +1,5 @@
-# gilmar
+# FarmaGOIE
 
-Repositório do projeto gilmar.
+Sistema de gestão para farmácias.
+
+Branch principal do repositório.
