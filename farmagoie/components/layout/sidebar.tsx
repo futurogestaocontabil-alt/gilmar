@@ -16,6 +16,7 @@ import {
   Shield,
   ChevronLeft,
   ChevronRight,
+  Database,
 } from "lucide-react";
 import { useState } from "react";
 
@@ -28,6 +29,7 @@ const NAV_ITEMS = [
   { href: "/viabilidade", label: "Viabilidade Industrial", icon: Factory },
   { href: "/alertas", label: "Central de Alertas", icon: Bell },
   { href: "/relatorios", label: "Relatórios", icon: FileText },
+  { href: "/admin/dados", label: "Gestão de Dados", icon: Database },
   { href: "/admin", label: "Administração", icon: Shield },
   { href: "/configuracoes", label: "Configurações", icon: Settings },
 ];
