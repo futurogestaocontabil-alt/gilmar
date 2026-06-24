@@ -1,11 +1,22 @@
 "use client";
 
-import { FileText, Download, Calendar, Filter, BarChart2, Activity, Pill, ShoppingCart } from "lucide-react";
+import { FileText, Download, Calendar, Filter, BarChart2, Activity, Pill, ShoppingCart, Handshake, CheckCircle2 } from "lucide-react";
 import { useState } from "react";
 import { SectionHeader } from "@/components/shared/section-header";
 import { DataDisclaimer } from "@/components/shared/data-disclaimer";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import {
+  exportDoencasCSV,
+  exportDoencasPDF,
+  exportMedicamentosCSV,
+  exportMedicamentosPDF,
+  exportComprasCSV,
+  exportComprasPDF,
+  exportPDPsCSV,
+  exportAlertasCSV,
+  exportExecutivoPDF,
+} from "@/lib/export";
 
 const RELATORIOS = [
   {
@@ -15,9 +26,11 @@ const RELATORIOS = [
     modulo: "Epidemiológico",
     periodicidade: "Mensal",
     ultima_geracao: "20/06/2024",
-    formato: ["PDF", "XLSX"],
+    formato: ["PDF", "CSV"],
     icon: Activity,
     color: "#0057B8",
+    onCSV: exportDoencasCSV,
+    onPDF: exportDoencasPDF,
   },
   {
     id: "r2",
@@ -26,9 +39,11 @@ const RELATORIOS = [
     modulo: "Medicamentos",
     periodicidade: "Semanal",
     ultima_geracao: "17/06/2024",
-    formato: ["PDF", "XLSX", "CSV"],
+    formato: ["PDF", "CSV"],
     icon: Pill,
     color: "#ef4444",
+    onCSV: exportMedicamentosCSV,
+    onPDF: exportMedicamentosPDF,
   },
   {
     id: "r3",
@@ -37,9 +52,11 @@ const RELATORIOS = [
     modulo: "Compras",
     periodicidade: "Quinzenal",
     ultima_geracao: "15/06/2024",
-    formato: ["PDF", "XLSX"],
+    formato: ["PDF", "CSV"],
     icon: ShoppingCart,
     color: "#8b5cf6",
+    onCSV: exportComprasCSV,
+    onPDF: exportComprasPDF,
   },
   {
     id: "r4",
@@ -48,20 +65,24 @@ const RELATORIOS = [
     modulo: "PDPs",
     periodicidade: "Trimestral",
     ultima_geracao: "01/06/2024",
-    formato: ["PDF"],
-    icon: BarChart2,
+    formato: ["CSV"],
+    icon: Handshake,
     color: "#10b981",
+    onCSV: exportPDPsCSV,
+    onPDF: null,
   },
   {
     id: "r5",
-    titulo: "Relatório de Viabilidade Industrial",
-    descricao: "Análise de viabilidade técnica, econômica e regulatória para produção farmacêutica local.",
-    modulo: "Viabilidade",
-    periodicidade: "Semestral",
-    ultima_geracao: "01/01/2024",
-    formato: ["PDF", "XLSX"],
+    titulo: "Central de Alertas — Export",
+    descricao: "Todos os alertas ativos e resolvidos com nível de criticidade e responsável.",
+    modulo: "Alertas",
+    periodicidade: "Diário",
+    ultima_geracao: "24/06/2024",
+    formato: ["CSV"],
     icon: BarChart2,
     color: "#f59e0b",
+    onCSV: exportAlertasCSV,
+    onPDF: null,
   },
   {
     id: "r6",
@@ -73,6 +94,8 @@ const RELATORIOS = [
     formato: ["PDF"],
     icon: FileText,
     color: "#334155",
+    onCSV: null,
+    onPDF: exportExecutivoPDF,
   },
 ];
 
@@ -81,11 +104,20 @@ const PERIODOS = ["Último mês", "Último trimestre", "Último semestre", "Últ
 export default function RelatoriosPage() {
   const [periodo, setPeriodo] = useState("Último mês");
   const [modulo, setModulo] = useState("Todos");
+  const [exportando, setExportando] = useState<string | null>(null);
 
   const modulos = ["Todos", ...Array.from(new Set(RELATORIOS.map((r) => r.modulo)))];
   const relatoriosFiltrados = RELATORIOS.filter(
     (r) => modulo === "Todos" || r.modulo === modulo
   );
+
+  async function handleExport(id: string, fn: (() => void) | null) {
+    if (!fn) return;
+    setExportando(id);
+    await new Promise((r) => setTimeout(r, 300));
+    fn();
+    setExportando(null);
+  }
 
   return (
     <div className="space-y-6">
@@ -104,7 +136,7 @@ export default function RelatoriosPage() {
             <div className="flex items-center gap-2">
               <Calendar className="h-4 w-4 text-gray-400" />
               <span className="text-xs text-gray-500">Período:</span>
-              <div className="flex gap-2">
+              <div className="flex gap-2 flex-wrap">
                 {PERIODOS.map((p) => (
                   <button
                     key={p}
@@ -147,6 +179,7 @@ export default function RelatoriosPage() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {relatoriosFiltrados.map((r) => {
           const Icon = r.icon;
+          const isExporting = exportando === r.id + "-csv" || exportando === r.id + "-pdf";
           return (
             <Card key={r.id} className="hover:shadow-md transition-shadow">
               <CardContent className="p-4 space-y-3">
@@ -164,7 +197,7 @@ export default function RelatoriosPage() {
 
                 <div className="flex items-center justify-between text-[10px] text-gray-400">
                   <span>Periodicidade: {r.periodicidade}</span>
-                  <span>Última geração: {r.ultima_geracao}</span>
+                  <span>Última: {r.ultima_geracao}</span>
                 </div>
 
                 <div className="flex items-center gap-2 pt-1 border-t border-gray-100">
@@ -175,24 +208,50 @@ export default function RelatoriosPage() {
                       </span>
                     ))}
                   </div>
-                  <Button size="sm" variant="outline" className="h-7 text-xs gap-1">
-                    <Download className="h-3 w-3" />
-                    Exportar
-                  </Button>
+                  <div className="flex gap-1">
+                    {r.onCSV && (
+                      <button
+                        onClick={() => handleExport(r.id + "-csv", r.onCSV)}
+                        disabled={isExporting}
+                        className="flex items-center gap-1 px-2 py-1 text-[10px] font-medium border border-gray-200 rounded hover:bg-green-50 hover:border-green-300 hover:text-green-700 transition-colors disabled:opacity-50"
+                      >
+                        <Download className="h-3 w-3" />
+                        CSV
+                      </button>
+                    )}
+                    {r.onPDF && (
+                      <button
+                        onClick={() => handleExport(r.id + "-pdf", r.onPDF)}
+                        disabled={isExporting}
+                        className="flex items-center gap-1 px-2 py-1 text-[10px] font-medium border border-gray-200 rounded hover:bg-blue-50 hover:border-blue-300 hover:text-blue-700 transition-colors disabled:opacity-50"
+                      >
+                        <Download className="h-3 w-3" />
+                        PDF
+                      </button>
+                    )}
+                  </div>
                 </div>
+
+                {isExporting && (
+                  <div className="flex items-center gap-2 text-[10px] text-blue-600">
+                    <div className="h-3 w-3 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
+                    Gerando arquivo...
+                  </div>
+                )}
               </CardContent>
             </Card>
           );
         })}
       </div>
 
-      {/* Nota */}
-      <Card className="bg-blue-50 border-blue-100">
-        <CardContent className="p-4">
-          <p className="text-xs text-blue-700 leading-relaxed">
-            <strong>Nota:</strong> Os relatórios são gerados com base em dados simulados para fins de demonstração.
-            Em ambiente de produção, os dados seriam extraídos diretamente das bases do SISREMUME, BNAFAR, COMPRASNET-GO e sistemas da SES-GO.
-            A exportação em PDF/XLSX estará disponível após integração com os sistemas de origem.
+      {/* Status */}
+      <Card className="bg-green-50 border-green-200">
+        <CardContent className="p-4 flex items-start gap-3">
+          <CheckCircle2 className="h-4 w-4 text-green-600 mt-0.5 shrink-0" />
+          <p className="text-xs text-green-700 leading-relaxed">
+            <strong>Exportação ativa:</strong> Os botões CSV e PDF geram arquivos reais com os dados do sistema.
+            CSV abre diretamente no Excel. PDF abre uma janela de impressão formatada.
+            Em produção, os dados seriam extraídos do SISREMUME, BNAFAR, COMPRASNET-GO e sistemas da SES-GO.
           </p>
         </CardContent>
       </Card>
